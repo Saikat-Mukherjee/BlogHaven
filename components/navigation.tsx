@@ -30,6 +30,23 @@ export default function Navigation() {
     return pathname === path || pathname.startsWith(path)
   }
 
+  const logout = async () => {
+    try {
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to log out');
+      }
+
+      // Redirect to login page after successful logout
+      // window.location.href = '/login';
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   return (
     <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
       <div className="container mx-auto px-4">
@@ -127,7 +144,7 @@ export default function Navigation() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => logout()}> {/* Implement logout logic */}
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>

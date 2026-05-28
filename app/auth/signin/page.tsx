@@ -7,11 +7,13 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import {useRouter} from "next/navigation"
 import Link from "next/link"
 
 export default function SignInPage() {
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -23,11 +25,22 @@ export default function SignInPage() {
       const password = formData.get("password") as string
 
       // TODO: Implement signin logic with backend API
-      
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Invalid email or password');
+      }
+
       toast({
         title: "Welcome back!",
         description: "You have successfully signed in.",
       })
+
+      router.push('/dashboard'); // Redirect to dashboard or home page after successful login
     } catch (error) {
       toast({
         title: "Error",
