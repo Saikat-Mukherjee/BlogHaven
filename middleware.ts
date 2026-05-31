@@ -53,6 +53,12 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get('access_token')?.value;
   const refreshToken = request.cookies.get('refresh_token')?.value;
 
+  // Redirect logged-in users away from auth pages
+  const isAuthPage = pathname === '/auth/signin' || pathname === '/auth/signup';
+  if (isAuthPage && !isTokenExpired(accessToken)) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
   // If access token is stale but we have a refresh token, rotate it!
   if (isTokenExpired(accessToken) && refreshToken) {
     try {
@@ -99,7 +105,7 @@ export async function middleware(request: NextRequest) {
     } catch (error) {
       console.error('Silent token refresh failed:', error);
       // Refresh token is likely expired (past 1 hour). Force clear tokens and send to login.
-      const loginUrl = new URL('/login', request.url);
+      const loginUrl = new URL('/auth/signin', request.url);
       const clearResponse = NextResponse.redirect(loginUrl);
       clearResponse.cookies.delete('access_token');
       clearResponse.cookies.delete('refresh_token');
