@@ -1,13 +1,32 @@
+"use client"
+
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { BookOpen, Clock, Heart, MessageSquare, TrendingUp, Star } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { BookOpen, Clock, TrendingUp } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 
-// Dummy data for demonstration
+type Post = {
+  id: number
+  slug: string
+  title: string
+  excerpt: string
+  status: string
+  visibility: string
+  published_at?: string
+  cover_image_url?: string
+  author_username: string
+  tags: string[]
+  categories: string[]
+  read_time_minutes: number
+  view_count: number
+}
+
+/* // Dummy data for demonstration
 const dummyPosts = [
   {
     id: "1",
@@ -123,13 +142,45 @@ const dummyPosts = [
       full_name: "James Park"
     }
   }
-]
-
-const categories = ["All", "Technology", "React", "Writing", "Database", "CSS", "AI/ML"]
-
+] */
 export default function ExplorePage() {
-  const featuredPosts = dummyPosts.filter(post => post.featured)
-  const regularPosts = dummyPosts.filter(post => !post.featured)
+  const [posts, setPosts] = useState<Post[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [sortBy, setSortBy] = useState("recent")
+  const [activeCategory, setActiveCategory] = useState("All")
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await fetch("/api/posts")
+        if (!response.ok) throw new Error(`Failed to fetch posts: ${response.status}`)
+        const data = await response.json()
+        setPosts(Array.isArray(data) ? data : (data.content ?? []))
+      } catch (error) {
+        console.error("Error fetching posts:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPosts()
+  }, [])
+
+  const categories = ["All", ...new Set(posts.flatMap(p => p.categories))]
+
+  const filteredPosts = posts
+    .filter(p => {
+      const matchesSearch =
+        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.excerpt.toLowerCase().includes(searchTerm.toLowerCase())
+      const matchesCategory = activeCategory === "All" || p.categories.includes(activeCategory)
+      return matchesSearch && matchesCategory
+    })
+    .sort((a, b) => {
+      if (sortBy === "popular") return b.view_count - a.view_count
+      // recent / default
+      return new Date(b.published_at ?? "").getTime() - new Date(a.published_at ?? "").getTime()
+    })
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -137,13 +188,6 @@ export default function ExplorePage() {
       day: 'numeric',
       year: 'numeric'
     })
-  }
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'k'
-    }
-    return num.toString()
   }
 
   return (
@@ -159,8 +203,10 @@ export default function ExplorePage() {
             <Input 
               placeholder="Search posts..." 
               className="max-w-sm"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <Select defaultValue="recent">
+            <Select value={sortBy} onValueChange={setSortBy}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
@@ -179,8 +225,9 @@ export default function ExplorePage() {
           {categories.map((category) => (
             <Badge 
               key={category} 
-              variant={category === "All" ? "default" : "secondary"}
+              variant={category === activeCategory ? "default" : "secondary"}
               className="cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+              onClick={() => setActiveCategory(category)}
             >
               {category}
             </Badge>
@@ -189,159 +236,98 @@ export default function ExplorePage() {
 
         <Separator className="my-8" />
 
-        {/* Featured Posts */}
-        {featuredPosts.length > 0 && (
-          <div className="mb-12">
-            <div className="flex items-center gap-2 mb-6">
-              <Star className="h-5 w-5 text-yellow-500" />
-              <h2 className="text-2xl font-semibold">Featured Posts</h2>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-              {featuredPosts.map((post) => (
-                <Link href={`/posts/${post.slug}`} key={post.id}>
-                  <Card className="h-full hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden group">
-                    <div className="relative aspect-video overflow-hidden">
-                      <img
-                        src={post.thumbnail}
-                        alt={post.title}
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute top-4 left-4">
-                        <Badge className="bg-yellow-500 text-yellow-50 hover:bg-yellow-600">
-                          <Star className="h-3 w-3 mr-1" />
-                          Featured
-                        </Badge>
-                      </div>
-                      <div className="absolute top-4 right-4">
-                        <Badge variant="secondary">{post.category}</Badge>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <div className="flex items-center gap-3 mb-4">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={post.users.avatar_url} alt={post.users.full_name} />
-                          <AvatarFallback>{post.users.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{post.users.full_name}</p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <time dateTime={post.published_at}>
-                              {formatDate(post.published_at)}
-                            </time>
-                            <span>•</span>
-                            <span>{post.reading_time}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <h2 className="text-xl font-semibold mb-3 line-clamp-2 group-hover:text-primary transition-colors">
-                        {post.title}
-                      </h2>
-                      
-                      <p className="text-muted-foreground mb-4 line-clamp-2">
-                        {post.excerpt}
-                      </p>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1 hover:text-red-500 transition-colors">
-                            <Heart className="h-4 w-4" />
-                            {formatNumber(post.likes)}
-                          </span>
-                          <span className="flex items-center gap-1 hover:text-blue-500 transition-colors">
-                            <MessageSquare className="h-4 w-4" />
-                            {post.comments}
-                          </span>
-                          <span className="flex items-center gap-1 hover:text-green-500 transition-colors">
-                            <BookOpen className="h-4 w-4" />
-                            {formatNumber(post.views)}
-                          </span>
-                        </div>
-                        <TrendingUp className="h-4 w-4 text-green-500" />
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Regular Posts */}
+        {/* Posts Grid */}
         <div className="mb-6">
           <h2 className="text-2xl font-semibold mb-6">Latest Posts</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {regularPosts.map((post) => (
-            <Link href={`/posts/${post.slug}`} key={post.id}>
-              <Card className="h-full hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden group">
-                <div className="relative aspect-video overflow-hidden">
-                  <img
-                    src={post.thumbnail}
-                    alt={post.title}
-                    className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-4 right-4">
-                    <Badge variant="secondary">{post.category}</Badge>
+          {isLoading ? (
+            <Card className="col-span-full p-8 text-center">
+              <p className="text-muted-foreground">Loading posts...</p>
+            </Card>
+          ) : filteredPosts.length === 0 ? (
+            <Card className="col-span-full p-8 text-center">
+              <p className="text-muted-foreground">
+                {searchTerm || activeCategory !== "All"
+                  ? "No posts match your search or filter."
+                  : "No posts available yet."}
+              </p>
+            </Card>
+          ) : (
+            filteredPosts.map((post) => (
+              <Link href={`/posts/${post.slug}`} key={post.id}>
+                <Card className="h-full hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden group">
+                  <div className="relative aspect-video overflow-hidden bg-muted">
+                    {post.cover_image_url ? (
+                      <img
+                        src={post.cover_image_url}
+                        alt={post.title}
+                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <BookOpen className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                    )}
+                    {post.categories[0] && (
+                      <div className="absolute top-4 right-4">
+                        <Badge variant="secondary">{post.categories[0]}</Badge>
+                      </div>
+                    )}
                   </div>
-                </div>
-                <div className="p-6">
-                  <div className="flex items-center gap-3 mb-4">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={post.users.avatar_url} alt={post.users.full_name} />
-                      <AvatarFallback>{post.users.username.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{post.users.full_name}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <time dateTime={post.published_at}>
-                          {formatDate(post.published_at)}
-                        </time>
-                        <span>•</span>
-                        <span>{post.reading_time}</span>
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>{post.author_username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{post.author_username}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {post.published_at && (
+                            <time dateTime={post.published_at}>
+                              {formatDate(post.published_at)}
+                            </time>
+                          )}
+                          <span>•</span>
+                          <span>{post.read_time_minutes} min read</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  
-                  <h2 className="text-lg font-semibold mb-3 line-clamp-2 group-hover:text-primary transition-colors">
-                    {post.title}
-                  </h2>
-                  
-                  <p className="text-muted-foreground mb-4 line-clamp-3 text-sm">
-                    {post.excerpt}
-                  </p>
 
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <span className="flex items-center gap-1 hover:text-red-500 transition-colors">
-                        <Heart className="h-4 w-4" />
-                        {formatNumber(post.likes)}
-                      </span>
-                      <span className="flex items-center gap-1 hover:text-blue-500 transition-colors">
-                        <MessageSquare className="h-4 w-4" />
-                        {post.comments}
-                      </span>
-                      <span className="flex items-center gap-1 hover:text-green-500 transition-colors">
-                        <BookOpen className="h-4 w-4" />
-                        {formatNumber(post.views)}
-                      </span>
+                    <h2 className="text-lg font-semibold mb-3 line-clamp-2 group-hover:text-primary transition-colors">
+                      {post.title}
+                    </h2>
+
+                    <p className="text-muted-foreground mb-4 line-clamp-3 text-sm">
+                      {post.excerpt}
+                    </p>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <BookOpen className="h-4 w-4" />
+                          {post.view_count.toLocaleString()} views
+                        </span>
+                      </div>
+                      <TrendingUp className="h-4 w-4 text-green-500" />
                     </div>
                   </div>
-                </div>
-              </Card>
-            </Link>
-          ))}
+                </Card>
+              </Link>
+            ))
+          )}
         </div>
 
         {/* Load More Button */}
-        <div className="text-center mt-12">
-          <button className="px-8 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium">
-            Load More Posts
-          </button>
-        </div>
+        {filteredPosts.length > 0 && (
+          <div className="text-center mt-8">
+            <p className="text-sm text-muted-foreground">
+              Showing {filteredPosts.length} of {posts.length} posts
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )

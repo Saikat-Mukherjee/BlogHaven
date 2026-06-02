@@ -1,29 +1,35 @@
+"use client"
+
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
-import { 
-  Heart, 
-  MessageSquare, 
-  Share2, 
-  Bookmark, 
-  Clock, 
-  Calendar,
-  User,
-  ThumbsUp,
-  Smile,
-  Award,
-  Eye,
-  ArrowLeft,
-  Send,
-  MoreHorizontal
-} from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Clock, Calendar, Eye, ArrowLeft, BookOpen } from "lucide-react"
 import Link from "next/link"
 import PostInteractions from "@/components/post-interactions"
 import CommentsSection from "@/components/comments-section"
+import { useState, useEffect, use } from "react"
 
-// Generate static params for static export
+type Post = {
+  id: number
+  slug: string
+  title: string
+  content: string
+  excerpt: string
+  cover_image_url?: string
+  author_username: string
+  tags: string[]
+  categories: string[]
+  status: string
+  visibility: string
+  read_time_minutes: number
+  view_count: number
+  created_at?: string
+  updated_at?: string
+  published_at?: string
+}
+
+/* // Generate static params for static export
 export async function generateStaticParams() {
   // Return a list of possible slug values for static generation
   // Include all post IDs that might be referenced
@@ -47,10 +53,10 @@ export async function generateStaticParams() {
     { slug: '11' },
     { slug: '12' }
   ]
-}
+} */
 
 // Mock data for different posts based on slug/id
-const getPostData = (slug: string) => {
+/* const getPostData = (slug: string) => {
   // Handle both slug-based and ID-based routing
   const postDataMap: { [key: string]: any } = {
     'future-web-development-2025': {
@@ -265,10 +271,10 @@ const getPostData = (slug: string) => {
 
   // Return the post data or a default post if not found
   return postDataMap[slug] || postDataMap['1']
-}
+} */
 
 // Dummy comments data
-const commentsData = [
+/* const commentsData = [
   {
     id: "1",
     content: "Excellent article! The section on WebAssembly particularly caught my attention. I've been experimenting with WASM for image processing and the performance gains are remarkable.",
@@ -321,18 +327,33 @@ const commentsData = [
     },
     replies_data: []
   }
-]
+] */
 
-const reactionTypes = [
-  { type: "like", icon: Heart, label: "Like", count: 142, color: "text-red-500" },
-  { type: "celebrate", icon: Award, label: "Celebrate", count: 34, color: "text-yellow-500" },
-  { type: "support", icon: ThumbsUp, label: "Support", count: 28, color: "text-blue-500" },
-  { type: "insightful", icon: Smile, label: "Insightful", count: 19, color: "text-green-500" }
-]
+export default function PostDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = use(params)
+  const [post, setPost] = useState<Post | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-export default async function PostDetailsPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params
-  const postData = getPostData(slug)
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const response = await fetch(`/api/posts/${slug}`)
+        if (!response.ok) {
+          setError(response.status === 404 ? "Post not found." : "Failed to load post.")
+          return
+        }
+        const data = await response.json()
+        setPost(data)
+      } catch (err) {
+        setError("Failed to load post.")
+        console.error("Error fetching post:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPost()
+  }, [slug])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -340,6 +361,25 @@ export default async function PostDetailsPage({ params }: { params: Promise<{ sl
       day: 'numeric',
       year: 'numeric'
     })
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading post...</p>
+      </div>
+    )
+  }
+
+  if (error || !post) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-4">{error ?? "Post not found."}</p>
+          <Button asChild><Link href="/explore">Back to Explore</Link></Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -354,8 +394,8 @@ export default async function PostDetailsPage({ params }: { params: Promise<{ sl
                 Back to Explore
               </Link>
             </Button>
-            <PostInteractions 
-              postId={postData.id}
+            <PostInteractions
+              postId={String(post.id)}
               initialBookmarked={false}
             />
           </div>
@@ -366,118 +406,98 @@ export default async function PostDetailsPage({ params }: { params: Promise<{ sl
         <div className="max-w-4xl mx-auto">
           {/* Article Header */}
           <div className="mb-8">
-            <div className="flex items-center gap-2 mb-4">
-              <Badge variant="secondary">{postData.category}</Badge>
-              {postData.tags.map((tag: string) => (
-                <Badge key={tag} variant="outline" className="text-xs">
-                  {tag}
-                </Badge>
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              {post.categories.map((cat) => (
+                <Badge key={cat} variant="secondary">{cat}</Badge>
+              ))}
+              {post.tags.map((tag) => (
+                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
               ))}
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-6">
-              {postData.title}
+              {post.title}
             </h1>
-            
+
             <p className="text-xl text-muted-foreground mb-8 leading-relaxed">
-              {postData.excerpt}
+              {post.excerpt}
             </p>
 
             {/* Author Info */}
             <div className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12">
-                  <AvatarImage src={postData.author.avatar_url} alt={postData.author.full_name} />
-                  <AvatarFallback>{postData.author.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                  <AvatarFallback>{post.author_username.slice(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{postData.author.full_name}</h3>
+                    <h3 className="font-semibold">{post.author_username}</h3>
                     <Button variant="outline" size="sm">Follow</Button>
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      {formatDate(postData.published_at)}
-                    </span>
+                    {post.published_at && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(post.published_at)}
+                      </span>
+                    )}
                     <span className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {postData.reading_time}
+                      {post.read_time_minutes} min read
                     </span>
                     <span className="flex items-center gap-1">
                       <Eye className="h-3 w-3" />
-                      {postData.views.toLocaleString()} views
+                      {post.view_count.toLocaleString()} views
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Featured Image */}
-            <div className="relative aspect-video mb-8 rounded-lg overflow-hidden">
-              <img
-                src={postData.thumbnail}
-                alt={postData.title}
-                className="object-cover w-full h-full"
-              />
-            </div>
+            {/* Cover Image */}
+            {post.cover_image_url ? (
+              <div className="relative aspect-video mb-8 rounded-lg overflow-hidden">
+                <img
+                  src={post.cover_image_url}
+                  alt={post.title}
+                  className="object-cover w-full h-full"
+                />
+              </div>
+            ) : (
+              <div className="relative aspect-video mb-8 rounded-lg overflow-hidden bg-muted flex items-center justify-center">
+                <BookOpen className="h-12 w-12 text-muted-foreground" />
+              </div>
+            )}
           </div>
 
           {/* Article Content */}
           <Card className="p-8 mb-8">
-            <div 
+            <div
               className="prose prose-lg max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-blockquote:text-muted-foreground prose-blockquote:border-l-primary prose-li:text-foreground"
-              dangerouslySetInnerHTML={{ __html: postData.content }}
+              dangerouslySetInnerHTML={{ __html: post.content }}
             />
           </Card>
 
-          {/* Reactions */}
-          <Card className="p-6 mb-8">
-            <h3 className="text-lg font-semibold mb-4">Show your appreciation</h3>
-            <div className="flex flex-wrap gap-3">
-              {reactionTypes.map((reaction) => {
-                const Icon = reaction.icon
-                return (
-                  <Button
-                    key={reaction.type}
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-2"
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{reaction.label}</span>
-                    <span className="text-xs bg-background/20 px-2 py-1 rounded">
-                      {reaction.count}
-                    </span>
-                  </Button>
-                )
-              })}
-            </div>
-          </Card>
-
-          {/* Author Bio */}
+          {/* Author Card */}
           <Card className="p-6 mb-8">
             <div className="flex items-start gap-4">
               <Avatar className="h-16 w-16">
-                <AvatarImage src={postData.author.avatar_url} alt={postData.author.full_name} />
-                <AvatarFallback>{postData.author.username.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarFallback>{post.author_username.slice(0, 2).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xl font-semibold">{postData.author.full_name}</h3>
+                  <h3 className="text-xl font-semibold">{post.author_username}</h3>
                   <Button variant="outline">Follow</Button>
                 </div>
-                <p className="text-muted-foreground mb-3">{postData.author.bio}</p>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>{postData.author.followers.toLocaleString()} followers</span>
-                  <span>{postData.author.posts} posts</span>
-                </div>
+                <p className="text-muted-foreground text-sm">
+                  View all posts by {post.author_username}
+                </p>
               </div>
             </div>
           </Card>
 
           {/* Comments Section */}
-          <CommentsSection comments={commentsData} />
+          <CommentsSection postSlug={post.slug} />
         </div>
       </div>
     </div>

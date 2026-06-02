@@ -17,7 +17,7 @@ import {
 import Link from "next/link"
 import EnhancedAuthorCard from "@/components/enhanced-author-card"
 
-// Mock authors data
+/* // Mock authors data
 const authorsData = [
   {
     id: "1",
@@ -163,10 +163,13 @@ const authorsData = [
     ],
     featured: false
   }
-]
+] */
+const authorsData: any[] = []
 
-const experienceLevels = ["All Levels", "Entry Level (0-2 years)", "Mid-Level (3-5 years)", "Senior Level (6-10 years)", "Expert (10+ years)"]
-const industries = ["All Industries", "Technology", "Management", "Sustainability", "Cybersecurity", "Design", "Marketing", "Finance"]
+/* const experienceLevels = ["All Levels", "Entry Level (0-2 years)", "Mid-Level (3-5 years)", "Senior Level (6-10 years)", "Expert (10+ years)"]
+const industries = ["All Industries", "Technology", "Management", "Sustainability", "Cybersecurity", "Design", "Marketing", "Finance"] */
+const experienceLevels: string[] = []
+const industries: string[] = []
 
 export default function AuthorsPage() {
   const featuredAuthors = authorsData.filter(author => author.featured)

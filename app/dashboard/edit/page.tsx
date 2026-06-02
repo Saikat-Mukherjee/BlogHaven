@@ -14,7 +14,7 @@ import { ArrowLeft, Save, Eye, Trash2, Calendar, Clock, AlertTriangle } from "lu
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
-// Mock data - in a real app, this would come from your database
+/* // Mock data - in a real app, this would come from your database
 const mockPosts = {
   "1": {
     id: "1",
@@ -75,9 +75,11 @@ const mockPosts = {
     meta_description: "",
     warnings: ["Low word count", "Missing featured image", "Missing meta description"]
   }
-}
+} */
+const mockPosts: Record<string, any> = {}
 
-const categories = ["Technology", "Business", "Lifestyle", "Design", "Finance", "Healthcare", "Productivity", "Marketing", "Career", "Health"]
+/* const categories = ["Technology", "Business", "Lifestyle", "Design", "Finance", "Healthcare", "Productivity", "Marketing", "Career", "Health"] */
+const categories: string[] = []
 
 function EditBlogContent() {
   const router = useRouter()
@@ -302,7 +304,7 @@ function EditBlogContent() {
                 <div>
                   <h3 className="font-medium text-orange-800 mb-2">Content Issues Detected</h3>
                   <div className="flex flex-wrap gap-2">
-                    {currentPost.warnings.map((warning, index) => (
+                    {currentPost.warnings.map((warning: string, index: number) => (
                       <Badge key={index} variant="destructive" className="text-xs">
                         {warning}
                       </Badge>
