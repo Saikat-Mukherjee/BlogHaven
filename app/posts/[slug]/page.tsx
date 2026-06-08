@@ -487,7 +487,9 @@ export default function PostDetailsPage({ params }: { params: Promise<{ slug: st
               <div className="flex-1">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xl font-semibold">{post.author_username}</h3>
-                  <Button variant="outline">Follow</Button>
+                  <Button variant="outline"
+                  onClick={() => alert('Follow functionality coming soon!')}
+                  >Follow</Button>
                 </div>
                 <p className="text-muted-foreground text-sm">
                   View all posts by {post.author_username}
