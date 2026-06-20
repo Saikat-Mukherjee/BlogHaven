@@ -8,10 +8,12 @@ import { Separator } from "@/components/ui/separator"
 import { BookOpen, Edit, Heart, Users } from "lucide-react"
 import { useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import {useRouter} from "next/navigation"
 
 export default function SignUpPage() {
-  const [isLoading, setIsLoading] = useState(false)
-  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -24,17 +26,30 @@ export default function SignUpPage() {
       const username = formData.get("username") as string
 
       // TODO: Implement signup logic with backend API
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, username }),
+      });
+      
+      if (!res.ok) {
+        throw new Error('Failed to create account');
+      }
       
       toast({
         title: "Account created!",
         description: "Please check your email to verify your account.",
       })
+
+      router.push('/auth/signin'); // Redirect to signin page after successful signup
+
     } catch (error) {
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
         variant: "destructive",
       })
+      console.error('Signup error:', error);
     } finally {
       setIsLoading(false)
     }

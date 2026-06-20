@@ -27,37 +27,27 @@ import {
   BarChart3
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import PostDropdownMenu from "@/components/post-dropdown-menu"
 
 type BlogPost = {
-  id: string
+  id: number
+  slug: string
   title: string
   excerpt: string
-  status: "draft" | "published" | "private"
-  created_at: string
-  updated_at: string
+  status: "PUBLISHED" | "DRAFT" | "PRIVATE"
+  visibility: string
   published_at?: string
-  thumbnail_url?: string
-  author: {
-    name: string
-    avatar: string
-  }
-  category: string
+  cover_image_url?: string
+  author_username: string
   tags: string[]
-  word_count: number
-  reading_time: string
-  views: number
-  likes: number
-  comments: number
-  seo_score: number
-  has_featured_image: boolean
-  has_meta_description: boolean
-  warnings: string[]
-  slug?: string
+  categories: string[]
+  read_time_minutes: number
+  view_count: number
+  warnings?: string[]
 }
 
-// Realistic blog posts data
+/* // Realistic blog posts data
 const blogPosts: BlogPost[] = [
   {
     id: "1",
@@ -363,7 +353,8 @@ const blogPosts: BlogPost[] = [
     warnings: [],
     slug: "sustainable-business-practices"
   }
-]
+] */
+const blogPosts: BlogPost[] = []
 
 export default function DashboardPage() {
   const [posts, setPosts] = useState<BlogPost[]>(blogPosts)
@@ -371,24 +362,36 @@ export default function DashboardPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [sortBy, setSortBy] = useState("updated")
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const response = await fetch("/api/posts")
+        if (!response.ok) throw new Error(`Failed to fetch posts: ${response.status}`)
+        const data = await response.json()
+        // Handle both plain array and paginated { content: [] } responses
+        setPosts(Array.isArray(data) ? data : (data.content ?? []))
+      } catch (error) {
+        console.error("Error fetching posts:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPosts()
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "published":
+      case "PUBLISHED":
         return "bg-green-500/10 text-green-500 hover:bg-green-500/20"
-      case "draft":
+      case "DRAFT":
         return "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20"
-      case "private":
+      case "PRIVATE":
         return "bg-blue-500/10 text-blue-500 hover:bg-blue-500/20"
       default:
         return "bg-gray-500/10 text-gray-500 hover:bg-gray-500/20"
     }
-  }
-
-  const getSEOScoreColor = (score: number) => {
-    if (score >= 90) return "text-green-500"
-    if (score >= 70) return "text-yellow-500"
-    return "text-red-500"
   }
 
   const formatDate = (dateString: string) => {
@@ -399,32 +402,28 @@ export default function DashboardPage() {
     })
   }
 
-  const handleDeletePost = (postId: string) => {
+  const handleDeletePost = (postId: number) => {
     setPosts(posts.filter(post => post.id !== postId))
   }
 
-  const handleArchivePost = (postId: string) => {
+  const handleArchivePost = (postId: number) => {
     setPosts(posts.map(post => 
       post.id === postId 
-        ? { ...post, status: "private" as const, updated_at: new Date().toISOString() }
+        ? { ...post, status: "PRIVATE" as const }
         : post
     ))
   }
 
-  const handleDuplicatePost = (postId: string) => {
+  const handleDuplicatePost = (postId: number) => {
     const postToDuplicate = posts.find(post => post.id === postId)
     if (postToDuplicate) {
       const newPost: BlogPost = {
         ...postToDuplicate,
-        id: `${Date.now()}`,
+        id: Date.now(),
         title: `${postToDuplicate.title} (Copy)`,
-        status: "draft",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: "DRAFT",
         published_at: undefined,
-        views: 0,
-        likes: 0,
-        comments: 0,
+        view_count: 0,
         slug: `${postToDuplicate.slug}-copy`
       }
       setPosts([newPost, ...posts])
@@ -435,7 +434,7 @@ export default function DashboardPage() {
     const matchesSearch = post.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          post.excerpt.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "all" || post.status === statusFilter
-    const matchesCategory = categoryFilter === "all" || post.category === categoryFilter
+    const matchesCategory = categoryFilter === "all" || post.categories.includes(categoryFilter)
     
     return matchesSearch && matchesStatus && matchesCategory
   })
@@ -444,27 +443,25 @@ export default function DashboardPage() {
     switch (sortBy) {
       case "title":
         return a.title.localeCompare(b.title)
-      case "created":
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       case "views":
-        return b.views - a.views
+        return b.view_count - a.view_count
+      case "created":
       case "updated":
       default:
-        return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+        return new Date(b.published_at ?? "").getTime() - new Date(a.published_at ?? "").getTime()
     }
   })
 
   const stats = {
     total: posts.length,
-    published: posts.filter(p => p.status === "published").length,
-    drafts: posts.filter(p => p.status === "draft").length,
-    private: posts.filter(p => p.status === "private").length,
-    totalViews: posts.reduce((sum, p) => sum + p.views, 0),
-    totalLikes: posts.reduce((sum, p) => sum + p.likes, 0),
-    postsWithWarnings: posts.filter(p => p.warnings.length > 0).length
+    published: posts.filter(p => p.status === "PUBLISHED").length,
+    drafts: posts.filter(p => p.status === "DRAFT").length,
+    private: posts.filter(p => p.status === "PRIVATE").length,
+    totalViews: posts.reduce((sum, p) => sum + p.view_count, 0),
+    postsWithWarnings: posts.filter(p => (p.warnings?.length ?? 0) > 0).length
   }
 
-  const categories = [...new Set(posts.map(p => p.category))]
+  const categories = [...new Set(posts.flatMap(p => p.categories))]
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -484,7 +481,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
               <FileText className="h-4 w-4 text-blue-500" />
@@ -515,26 +512,10 @@ export default function DashboardPage() {
           </Card>
           <Card className="p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Heart className="h-4 w-4 text-red-500" />
-              <span className="text-sm font-medium">Total Likes</span>
-            </div>
-            <p className="text-2xl font-bold">{stats.totalLikes}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
               <AlertTriangle className="h-4 w-4 text-orange-500" />
               <span className="text-sm font-medium">Warnings</span>
             </div>
             <p className="text-2xl font-bold text-orange-500">{stats.postsWithWarnings}</p>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <BarChart3 className="h-4 w-4 text-purple-500" />
-              <span className="text-sm font-medium">Avg. SEO</span>
-            </div>
-            <p className="text-2xl font-bold">
-              {Math.round(posts.reduce((sum, p) => sum + p.seo_score, 0) / posts.length)}
-            </p>
           </Card>
         </div>
 
@@ -558,9 +539,9 @@ export default function DashboardPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="published">Published</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="PUBLISHED">Published</SelectItem>
+                <SelectItem value="DRAFT">Draft</SelectItem>
+                <SelectItem value="PRIVATE">Private</SelectItem>
               </SelectContent>
             </Select>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -590,7 +571,11 @@ export default function DashboardPage() {
 
         {/* Posts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {sortedPosts.length === 0 ? (
+          {isLoading ? (
+            <Card className="col-span-full p-8 text-center">
+              <p className="text-muted-foreground">Loading posts...</p>
+            </Card>
+          ) : sortedPosts.length === 0 ? (
             <Card className="col-span-full p-8 text-center">
               <h2 className="text-xl font-semibold mb-2">No posts found</h2>
               <p className="text-muted-foreground mb-4">
@@ -611,9 +596,9 @@ export default function DashboardPage() {
               <Card key={post.id} className="flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
                 {/* Thumbnail */}
                 <div className="relative aspect-video bg-muted">
-                  {post.thumbnail_url ? (
+                  {post.cover_image_url ? (
                     <img
-                      src={post.thumbnail_url}
+                      src={post.cover_image_url}
                       alt={post.title}
                       className="object-cover w-full h-full"
                     />
@@ -624,14 +609,14 @@ export default function DashboardPage() {
                   )}
                   <div className="absolute top-3 left-3">
                     <Badge className={getStatusColor(post.status)}>
-                      {post.status}
+                      {post.status.toLowerCase()}
                     </Badge>
                   </div>
-                  {post.warnings.length > 0 && (
+                  {(post.warnings?.length ?? 0) > 0 && (
                     <div className="absolute top-3 right-3">
                       <Badge variant="destructive" className="flex items-center gap-1">
                         <AlertTriangle className="h-3 w-3" />
-                        {post.warnings.length}
+                        {post.warnings!.length}
                       </Badge>
                     </div>
                   )}
@@ -641,13 +626,12 @@ export default function DashboardPage() {
                 <div className="p-6 flex-1 flex flex-col">
                   {/* Category and Author */}
                   <div className="flex items-center justify-between mb-3">
-                    <Badge variant="outline">{post.category}</Badge>
+                    <Badge variant="outline">{post.categories[0]}</Badge>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6">
-                        <AvatarImage src={post.author.avatar} alt={post.author.name} />
-                        <AvatarFallback>{post.author.name.slice(0, 2)}</AvatarFallback>
+                        <AvatarFallback>{post.author_username.slice(0, 2).toUpperCase()}</AvatarFallback>
                       </Avatar>
-                      <span className="text-xs text-muted-foreground">{post.author.name}</span>
+                      <span className="text-xs text-muted-foreground">{post.author_username}</span>
                     </div>
                   </div>
 
@@ -662,17 +646,17 @@ export default function DashboardPage() {
                   </p>
 
                   {/* Warnings */}
-                  {post.warnings.length > 0 && (
+                  {(post.warnings?.length ?? 0) > 0 && (
                     <div className="mb-4">
                       <div className="flex flex-wrap gap-1">
-                        {post.warnings.slice(0, 2).map((warning, index) => (
+                        {post.warnings!.slice(0, 2).map((warning, index) => (
                           <Badge key={index} variant="destructive" className="text-xs">
                             {warning}
                           </Badge>
                         ))}
-                        {post.warnings.length > 2 && (
+                        {post.warnings!.length > 2 && (
                           <Badge variant="destructive" className="text-xs">
-                            +{post.warnings.length - 2} more
+                            +{post.warnings!.length - 2} more
                           </Badge>
                         )}
                       </div>
@@ -683,38 +667,16 @@ export default function DashboardPage() {
                   <div className="space-y-3 mb-4">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
-                        <FileText className="h-3 w-3" />
-                        {post.word_count} words
-                      </span>
-                      <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {post.reading_time}
+                        {post.read_time_minutes} min read
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">
-                        SEO Score: <span className={getSEOScoreColor(post.seo_score)}>{post.seo_score}/100</span>
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {post.has_featured_image && <ImageIcon className="h-3 w-3 text-green-500" />}
-                        {post.has_meta_description && <FileText className="h-3 w-3 text-green-500" />}
-                      </div>
-                    </div>
-
-                    {post.status === "published" && (
+                    {post.status === "PUBLISHED" && (
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Eye className="h-3 w-3" />
-                          {post.views.toLocaleString()}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Heart className="h-3 w-3" />
-                          {post.likes}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <MessageSquare className="h-3 w-3" />
-                          {post.comments}
+                          {post.view_count.toLocaleString()} views
                         </span>
                       </div>
                     )}
@@ -723,12 +685,11 @@ export default function DashboardPage() {
                   {/* Footer */}
                   <div className="flex items-center justify-between mt-auto pt-4 border-t">
                     <div className="text-xs text-muted-foreground">
-                      <div className="flex items-center gap-1 mb-1">
-                        <Calendar className="h-3 w-3" />
-                        Updated {formatDate(post.updated_at)}
-                      </div>
                       {post.published_at && (
-                        <div>Published {formatDate(post.published_at)}</div>
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          Published {formatDate(post.published_at)}
+                        </div>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -738,7 +699,7 @@ export default function DashboardPage() {
                         </Link>
                       </Button>
                       <PostDropdownMenu
-                        postId={post.id}
+                        postId={String(post.id)}
                         postTitle={post.title}
                         postStatus={post.status}
                         postSlug={post.slug}

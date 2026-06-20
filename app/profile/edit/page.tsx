@@ -13,79 +13,114 @@ import { useToast } from "@/hooks/use-toast"
 import { useState } from "react"
 import { ArrowLeft, Save, Upload, X, Plus } from "lucide-react"
 import Link from "next/link"
-
-const experienceLevels = [
-  "Entry Level (0-2 years)",
-  "Mid-Level (3-5 years)", 
-  "Senior Level (6-10 years)",
-  "Expert (10+ years)"
-]
-
-const industries = [
-  "Technology", "Business", "Design", "Finance", "Healthcare", 
-  "Marketing", "Education", "Consulting", "Media", "Non-Profit"
-]
-
-const skillSuggestions = [
-  "React", "Node.js", "TypeScript", "Python", "JavaScript", "AWS", "Docker",
-  "Project Management", "Team Leadership", "Agile/Scrum", "Data Analysis",
-  "UI/UX Design", "Digital Marketing", "Content Strategy", "SEO"
-]
-
-const expertiseAreas = [
-  "Full-Stack Development", "Frontend Development", "Backend Development",
-  "Mobile Development", "DevOps", "Data Science", "Machine Learning",
-  "System Architecture", "Team Leadership", "Product Management",
-  "Digital Marketing", "Content Creation", "Business Strategy"
-]
+import { useEffect } from "react"
+import {
+  EXPERIENCE_LEVELS,
+  INDUSTRIES,
+  SKILL_SUGGESTIONS,
+  EXPERTISE_AREAS,
+  CONTACT_PREFERENCES,
+  toExperienceLevel,
+  toIndustry,
+  toSkillSuggestions,
+  toExpertiseAreas,
+  toContactPreferences,
+} from "@/lib/profile-enums"
 
 export default function EditProfilePage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [avatar, setAvatar] = useState<string | null>("https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop&crop=face")
+  const [isFetching, setIsFetching] = useState(true)
+  const [currentUsername, setCurrentUsername] = useState<string>("")
+  const [avatar, setAvatar] = useState<string | null>(null)
   const [newSkill, setNewSkill] = useState("")
+
   const [formData, setFormData] = useState({
-    full_name: "Alex Johnson",
-    username: "alexdev",
-    bio: "Senior Full-Stack Developer with 8+ years of experience in modern web technologies. Passionate about AI and emerging tech trends.",
-    professional_summary: "Innovative full-stack developer specializing in React, Node.js, and cloud architecture. I help startups and enterprises build scalable web applications that drive business growth.",
-    experience_level: "Expert (10+ years)",
-    location: "San Francisco, CA",
-    timezone: "PST (UTC-8)",
-    website: "https://alexdev.io",
-    email: "alex@alexdev.io",
-    phone: "+1 (555) 123-4567",
-    linkedin: "https://linkedin.com/in/alexjohnson",
-    twitter: "https://twitter.com/alexdev",
-    github: "https://github.com/alexdev",
-    primary_industry: "Technology",
-    secondary_industry: "Fintech",
-    availability: "Available for consulting",
-    work_style: "Remote-first, collaborative",
-    native_language: "English",
-    professional_language: "Spanish",
-    conversational_language: "French",
-    contact_preferences: ["Email", "LinkedIn"]
+    full_name: "",
+    username: "",
+    bio: "",
+    professional_summary: "",
+    experience_level: "",
+    location: "",
+    timezone: "",
+    website: "",
+    email: "",
+    phone_number: "",
+    linkedin: "",
+    twitter: "",
+    github: "",
+    primary_industry: "",
+    secondary_industry: "",
+    availability: "",
+    work_style: "",
+    native_language: "",
+    professional_language: "",
+    conversational_language: "",
+    contact_preferences: [] as string[]
   })
-  
-  const [coreSkills, setCoreSkills] = useState([
-    "React & Next.js", "Node.js & Express", "TypeScript", "AWS & Cloud Architecture", "Database Design"
-  ])
-  
-  const [selectedExpertise, setSelectedExpertise] = useState([
-    "Full-Stack Development", "System Architecture", "Team Leadership"
-  ])
-  
-  const [achievements, setAchievements] = useState([
-    "Led development of a platform serving 100K+ users",
-    "Reduced application load time by 60% through optimization", 
-    "Mentored 15+ junior developers across multiple teams"
-  ])
-  
-  const [interests, setInterests] = useState([
-    "AI/Machine Learning", "Open Source Contributions", "Tech Mentoring"
-  ])
+
+  const [coreSkills, setCoreSkills] = useState<string[]>([])
+  const [selectedExpertise, setSelectedExpertise] = useState<string[]>([])
+  const [achievements, setAchievements] = useState<string[]>([])
+  const [interests, setInterests] = useState<string[]>([])
 
   const { toast } = useToast()
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        // 1. Get the current user's username from the auth token
+        const meRes = await fetch('/api/auth/me')
+        if (!meRes.ok) return
+        const meData = await meRes.json()
+        const username: string = meData.user?.username ?? ""
+        if (!username) return
+
+        setCurrentUsername(username)
+
+        // 2. Fetch the full profile via the Next.js proxy (which forwards the auth cookie)
+        const profileRes = await fetch(`/api/profile/${username}`)
+        if (!profileRes.ok) return
+        const data = await profileRes.json()
+
+        setAvatar(data.avatar_url ?? null)
+        setFormData({
+          full_name: data.name ?? "",
+          username: data.username ?? "",
+          bio: data.bio ?? "",
+          professional_summary: data.professional_summary ?? "",
+          experience_level: toExperienceLevel(data.experience_level) ?? "",
+          location: data.location ?? "",
+          timezone: data.timezone ?? "",
+          website: data.website_url ?? "",
+          email: data.email ?? "",
+          phone_number: data.phone_number ?? "",
+          linkedin: data.linkedin_url ?? "",
+          twitter: data.twitter_url ?? "",
+          github: data.github_url ?? "",
+          primary_industry: toIndustry(data.primary_industry) ?? "",
+          secondary_industry: toIndustry(data.secondary_industry) ?? "",
+          availability: data.availability ?? "",
+          work_style: data.work_style ?? "",
+          native_language: data.native_language ?? "",
+          professional_language: data.professional_language ?? "",
+          conversational_language: data.conversational_language ?? "",
+          contact_preferences: toContactPreferences(data.contact_preferences),
+        })
+        //setCoreSkills(toSkillSuggestions(data.core_skills))
+        setCoreSkills(data.core_skills ?? [])  //will change after changing the same for backend
+       // setSelectedExpertise(toExpertiseAreas(data.expertise_areas))
+        setSelectedExpertise(data.expertise_areas ?? [])  //will change after changing the same for backend
+        setAchievements(data.achievements ?? [])
+        setInterests(data.interests ?? [])
+      } catch (error) {
+        console.error('Failed to load profile:', error)
+      } finally {
+        setIsFetching(false)
+      }
+    }
+
+    fetchProfile()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -185,11 +220,17 @@ export default function EditProfilePage() {
     <div className="min-h-screen bg-background py-8">
       <div className="container mx-auto px-4">
         <div className="max-w-4xl mx-auto">
+          {isFetching ? (
+            <div className="flex items-center justify-center min-h-[60vh]">
+              <div className="text-muted-foreground">Loading profile...</div>
+            </div>
+          ) : (
+          <>
           {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-4">
               <Button variant="ghost" asChild>
-                <Link href="/profile/alexdev">
+                <Link href={currentUsername ? `/profile/${currentUsername}` : "/dashboard"}>
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Profile
                 </Link>
@@ -317,7 +358,7 @@ export default function EditProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {experienceLevels.map((level) => (
+                      {EXPERIENCE_LEVELS.map((level) => (
                         <SelectItem key={level} value={level}>{level}</SelectItem>
                       ))}
                     </SelectContent>
@@ -331,7 +372,7 @@ export default function EditProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {industries.map((industry) => (
+                      {INDUSTRIES.map((industry) => (
                         <SelectItem key={industry} value={industry}>{industry}</SelectItem>
                       ))}
                     </SelectContent>
@@ -364,7 +405,7 @@ export default function EditProfilePage() {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2">
-                  {skillSuggestions.filter(skill => !coreSkills.includes(skill)).slice(0, 8).map((skill) => (
+                  {SKILL_SUGGESTIONS.filter(skill => !coreSkills.includes(skill)).slice(0, 8).map((skill) => (
                     <Badge 
                       key={skill} 
                       variant="outline" 
@@ -381,7 +422,7 @@ export default function EditProfilePage() {
               <div className="space-y-4">
                 <Label>Areas of Expertise (Choose 3) *</Label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {expertiseAreas.map((area) => (
+                  {EXPERTISE_AREAS.map((area) => (
                     <div key={area} className="flex items-center space-x-2">
                       <Checkbox
                         id={area}
@@ -407,7 +448,7 @@ export default function EditProfilePage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {industries.map((industry) => (
+                      {INDUSTRIES.map((industry) => (
                         <SelectItem key={industry} value={industry}>{industry}</SelectItem>
                       ))}
                     </SelectContent>
@@ -421,7 +462,7 @@ export default function EditProfilePage() {
                       <SelectValue placeholder="Select secondary industry" />
                     </SelectTrigger>
                     <SelectContent>
-                      {industries.filter(industry => industry !== formData.primary_industry).map((industry) => (
+                      {INDUSTRIES.filter(industry => industry !== formData.primary_industry).map((industry) => (
                         <SelectItem key={industry} value={industry}>{industry}</SelectItem>
                       ))}
                     </SelectContent>
@@ -540,8 +581,8 @@ export default function EditProfilePage() {
                   <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
-                    value={formData.phone}
-                    onChange={(e) => handleInputChange("phone", e.target.value)}
+                    value={formData.phone_number}
+                    onChange={(e) => handleInputChange("phone_number", e.target.value)}
                   />
                 </div>
 
@@ -590,7 +631,7 @@ export default function EditProfilePage() {
               <div className="space-y-4">
                 <Label>Contact Preferences *</Label>
                 <div className="flex flex-wrap gap-4">
-                  {["Email", "Phone", "LinkedIn", "Twitter"].map((preference) => (
+                  {CONTACT_PREFERENCES.map((preference) => (
                     <div key={preference} className="flex items-center space-x-2">
                       <Checkbox
                         id={preference}
@@ -634,7 +675,8 @@ export default function EditProfilePage() {
             {/* Action Buttons */}
             <div className="flex justify-end gap-4 pt-6 border-t">
               <Button variant="outline" type="button" asChild>
-                <Link href="/profile/alexdev">Cancel</Link>
+
+                <Link href={currentUsername ? `/profile/${currentUsername}` : "/dashboard"}>Cancel</Link>
               </Button>
               <Button type="submit" disabled={isLoading}>
                 <Save className="w-4 h-4 mr-2" />
@@ -642,6 +684,8 @@ export default function EditProfilePage() {
               </Button>
             </div>
           </form>
+          </>
+          )}
         </div>
       </div>
     </div>

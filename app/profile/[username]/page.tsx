@@ -2,7 +2,6 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Separator } from "@/components/ui/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   MapPin, 
@@ -14,40 +13,89 @@ import {
   Twitter, 
   Github,
   Award,
-  Users,
   BookOpen,
   Heart,
   MessageSquare,
   Eye,
   ArrowLeft,
   Edit,
-  Share2,
-  MoreHorizontal,
   Star,
   Briefcase,
-  GraduationCap,
   Languages,
   Clock,
   TrendingUp
 } from "lucide-react"
 import Link from "next/link"
 import ProfileInteractions from "@/components/profile-interactions"
+import { cookies } from "next/headers"
 
-// Generate static params for static export
-export async function generateStaticParams() {
-  return [
-    { username: 'alexdev' },
-    { username: 'sarahmanager' },
-    { username: 'reactdev' },
-    { username: 'ecowarrior' },
-    { username: 'devmike' },
-    { username: 'securitypro' },
-    { username: 'aidev' }
-  ]
+// ---------------------------------------------------------------------------
+// Types — replace with generated API types (e.g. from OpenAPI / Prisma) when
+// the backend is connected.
+// ---------------------------------------------------------------------------
+interface UserProfile {
+  id: string
+  username: string
+  full_name: string
+  avatar_url: string
+  bio?: string
+  location?: string
+  timezone?: string
+  website?: string
+  email?: string
+  phone?: string
+  linkedin?: string
+  twitter?: string
+  github?: string
+  joined_date: string
+  followers: number
+  following: number
+  posts_count: number
+  total_likes: number
+  total_views: number
+  experience_level?: string
+  availability?: string
+  work_style?: string
+  professional_summary?: string
+  core_skills?: string[]
+  industry_focus?: { primary?: string; secondary?: string }
+  achievements?: string[]
+  expertise_areas?: string[]
+  languages?: { native?: string; professional?: string; conversational?: string }
+  interests?: string[]
+  contact_preferences?: string[]
+  featured_posts?: {
+    id: string
+    title: string
+    excerpt: string
+    slug: string
+    published_at: string
+    reading_time: string
+    likes: number
+    comments: number
+    views: number
+    category: string
+    thumbnail: string
+  }[]
+  recent_activity?: {
+    type: 'post' | 'comment' | 'like'
+    title: string
+    date: string
+    link: string
+  }[]
 }
 
-// Mock user profile data
-const getUserProfile = (username: string) => {
+// TODO: Replace with dynamic params fetched from API or remove if using fully dynamic rendering
+// export async function generateStaticParams() {
+//   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/users`)
+//   const users = await res.json()
+//   return users.map((u: { username: string }) => ({ username: u.username }))
+// }
+
+// TODO: Remove this mock and replace with: GET /api/users/${username}/profile
+// All data below is HARDCODED placeholder — not real user data
+/*
+const getUserProfile_MOCK = (username: string) => {
   const profiles: { [key: string]: any } = {
     'alexdev': {
       id: "1",
@@ -202,10 +250,68 @@ const getUserProfile = (username: string) => {
 
   return profiles[username] || profiles['alexdev']
 }
+*/
+
+// Fetches profile directly from Spring Boot — called server-side where relative URLs are invalid.
+const getUserProfile = async (username: string, accessToken?: string): Promise<UserProfile | null> => {
+  try {
+    const res = await fetch(
+      `${process.env.SPRING_BOOT_API_URL}/api/profiles/${username}`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        cache: 'no-store',
+      }
+    )
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+/** Decodes the access_token cookie to read the logged-in user's username. */
+async function getCurrentUser(): Promise<{ username: string | null; token: string | null }> {
+  try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get('access_token')?.value ?? null
+    if (!token) return { username: null, token: null }
+    const parts = token.split('.')
+    if (parts.length < 2) return { username: null, token: null }
+    let base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const pad = base64.length % 4
+    if (pad === 2) base64 += '=='
+    else if (pad === 3) base64 += '='
+    const payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'))
+    const username = payload.sub ?? payload.username ?? null
+    return { username, token }
+  } catch {
+    return { username: null, token: null }
+  }
+}
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = await params
-  const profile = getUserProfile(username)
+  const { username: currentUsername, token } = await getCurrentUser()
+  const isOwnProfile = currentUsername !== null && currentUsername === username
+
+  const profile = await getUserProfile(username, token ?? undefined)
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-2">Profile not found</h1>
+          <p className="text-muted-foreground mb-4">The user @{username} does not exist.</p>
+          <Button asChild>
+            <Link href="/explore">Browse Authors</Link>
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -232,15 +338,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
       {/* Header */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/explore" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Back to Explore
-              </Link>
-            </Button>
-            <ProfileInteractions />
-          </div>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/explore" className="flex items-center gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Back to Explore
+            </Link>
+          </Button>
         </div>
       </div>
 
@@ -259,13 +362,10 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                   <h1 className="text-3xl font-bold mb-2">{profile.full_name}</h1>
                   <p className="text-lg text-muted-foreground mb-4">@{profile.username}</p>
                   <div className="flex flex-wrap gap-2 justify-center md:justify-start mb-4">
-                    <Badge variant="secondary">{profile.experience_level}</Badge>
-                    <Badge variant="outline">{profile.industry_focus.primary}</Badge>
+                    {profile.experience_level && <Badge variant="secondary">{profile.experience_level}</Badge>}
+                    {profile.industry_focus?.primary && <Badge variant="outline">{profile.industry_focus.primary}</Badge>}
                   </div>
-                  <Button className="w-full md:w-auto">
-                    <Users className="h-4 w-4 mr-2" />
-                    Follow
-                  </Button>
+                  <ProfileInteractions isOwnProfile={isOwnProfile} username={username} />
                 </div>
               </div>
 
@@ -279,19 +379,19 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                 {/* Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{profile.followers.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-primary">{(profile.followers ?? 0).toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Followers</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{profile.posts_count}</div>
+                    <div className="text-2xl font-bold text-primary">{profile.posts_count ?? 0}</div>
                     <div className="text-sm text-muted-foreground">Posts</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{profile.total_likes.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-primary">{(profile.total_likes ?? 0).toLocaleString()}</div>
                     <div className="text-sm text-muted-foreground">Total Likes</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{(profile.total_views / 1000).toFixed(1)}K</div>
+                    <div className="text-2xl font-bold text-primary">{((profile.total_views ?? 0) / 1000).toFixed(1)}K</div>
                     <div className="text-sm text-muted-foreground">Total Views</div>
                   </div>
                 </div>
@@ -339,7 +439,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                       Core Skills
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {profile.core_skills.map((skill: string) => (
+                      {(profile.core_skills ?? []).map((skill: string) => (
                         <Badge key={skill} variant="secondary" className="text-sm">
                           {skill}
                         </Badge>
@@ -354,7 +454,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                       Areas of Expertise
                     </h3>
                     <div className="space-y-2">
-                      {profile.expertise_areas.map((area: string, index: number) => (
+                      {(profile.expertise_areas ?? []).map((area: string, index: number) => (
                         <div key={area} className="flex items-center gap-2">
                           <span className="w-6 h-6 bg-primary/10 text-primary rounded-full flex items-center justify-center text-sm font-medium">
                             {index + 1}
@@ -372,18 +472,24 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                       Languages
                     </h3>
                     <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>{profile.languages.native}</span>
-                        <Badge variant="outline">Native</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{profile.languages.professional}</span>
-                        <Badge variant="outline">Professional</Badge>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>{profile.languages.conversational}</span>
-                        <Badge variant="outline">Conversational</Badge>
-                      </div>
+                      {profile.languages?.native && (
+                        <div className="flex justify-between">
+                          <span>{profile.languages.native}</span>
+                          <Badge variant="outline">Native</Badge>
+                        </div>
+                      )}
+                      {profile.languages?.professional && (
+                        <div className="flex justify-between">
+                          <span>{profile.languages.professional}</span>
+                          <Badge variant="outline">Professional</Badge>
+                        </div>
+                      )}
+                      {profile.languages?.conversational && (
+                        <div className="flex justify-between">
+                          <span>{profile.languages.conversational}</span>
+                          <Badge variant="outline">Conversational</Badge>
+                        </div>
+                      )}
                     </div>
                   </Card>
 
@@ -394,7 +500,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                       Professional Interests
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {profile.interests.map((interest: string) => (
+                      {(profile.interests ?? []).map((interest: string) => (
                         <Badge key={interest} variant="outline">
                           {interest}
                         </Badge>
@@ -404,8 +510,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                 </TabsContent>
 
                 <TabsContent value="posts" className="space-y-6">
-                  {profile.featured_posts.length > 0 ? (
-                    profile.featured_posts.map((post: any) => (
+                  {(profile.featured_posts?.length ?? 0) > 0 ? (
+                    profile.featured_posts!.map((post: any) => (
                       <Card key={post.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                         <div className="flex">
                           <div className="w-48 h-32">
@@ -464,8 +570,8 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                 </TabsContent>
 
                 <TabsContent value="activity" className="space-y-4">
-                  {profile.recent_activity.length > 0 ? (
-                    profile.recent_activity.map((activity: any, index: number) => (
+                  {(profile.recent_activity?.length ?? 0) > 0 ? (
+                    profile.recent_activity!.map((activity: any, index: number) => (
                       <Card key={index} className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -500,7 +606,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
                       Professional Achievements
                     </h3>
                     <div className="space-y-3">
-                      {profile.achievements.map((achievement: string, index: number) => (
+                      {(profile.achievements ?? []).map((achievement: string, index: number) => (
                         <div key={index} className="flex items-start gap-3">
                           <div className="w-6 h-6 bg-green-100 text-green-600 rounded-full flex items-center justify-center mt-0.5">
                             <Award className="h-3 w-3" />
@@ -567,19 +673,25 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
               </Card>
 
               {/* Industry Focus */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Industry Focus</h3>
-                <div className="space-y-2">
-                  <div>
-                    <span className="text-sm font-medium">Primary:</span>
-                    <Badge variant="default" className="ml-2">{profile.industry_focus.primary}</Badge>
+              {profile.industry_focus && (
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Industry Focus</h3>
+                  <div className="space-y-2">
+                    {profile.industry_focus.primary && (
+                      <div>
+                        <span className="text-sm font-medium">Primary:</span>
+                        <Badge variant="default" className="ml-2">{profile.industry_focus.primary}</Badge>
+                      </div>
+                    )}
+                    {profile.industry_focus.secondary && (
+                      <div>
+                        <span className="text-sm font-medium">Secondary:</span>
+                        <Badge variant="outline" className="ml-2">{profile.industry_focus.secondary}</Badge>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-sm font-medium">Secondary:</span>
-                    <Badge variant="outline" className="ml-2">{profile.industry_focus.secondary}</Badge>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              )}
             </div>
           </div>
         </div>
